@@ -1,0 +1,51 @@
+import { instant } from '@next/playwright';
+import { test, expect } from '@playwright/test';
+
+test.describe('Playlist detail page (/playlist/[id])', () => {
+  test('initial page load shows the shell without playlist details', async ({ page }) => {
+    await page.goto('/playlist');
+    const link = page.locator('main a[href^="/playlist/"]').first();
+    await link.waitFor({ state: 'visible', timeout: 15000 });
+    const href = await link.getAttribute('href');
+    if (!href) throw new Error('Expected the playlist link to have an href');
+
+    await instant(page, async () => {
+      await page.goto(href);
+      await expect(page.locator('main h1')).toHaveCount(0);
+    });
+  });
+
+  test('client navigation shows the playlist details resolved at prefetch time', async ({ page }) => {
+    await page.goto('/playlist');
+    const link = page.locator('main a[href^="/playlist/"]').first();
+    await link.waitFor({ state: 'visible', timeout: 15000 });
+    const href = await link.getAttribute('href');
+    if (!href) throw new Error('Expected the playlist link to have an href');
+    const heading = (await link.locator('span').first().textContent())?.trim();
+    if (!heading) throw new Error('Expected the playlist link to have a label');
+
+    await instant(page, async () => {
+      await link.click();
+      await page.waitForURL(url => url.pathname === href);
+      await expect(page.getByRole('heading', { exact: true, name: heading })).toBeVisible();
+    });
+  });
+
+  test('sidebar hover prefetches playlist details before navigation', async ({ page }) => {
+    await page.goto('/');
+    const link = page.locator('aside a[href^="/playlist/"]').first();
+    await link.waitFor({ state: 'visible', timeout: 15000 });
+    const href = await link.getAttribute('href');
+    if (!href) throw new Error('Expected the playlist link to have an href');
+    const heading = await link.getAttribute('aria-label');
+    if (!heading) throw new Error('Expected the playlist link to have a label');
+
+    await link.hover();
+
+    await instant(page, async () => {
+      await link.click();
+      await page.waitForURL(url => url.pathname === href);
+      await expect(page.getByRole('heading', { exact: true, name: heading })).toBeVisible();
+    });
+  });
+});
